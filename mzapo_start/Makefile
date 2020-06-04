@@ -9,6 +9,7 @@ LDFLAGS = -lrt -lpthread
 SOURCES = change_me.c mzapo_phys.c
 TARGET_EXE = change_me
 #TARGET_IP ?= 192.168.202.127
+TARGET_IP ?= 10.0.0.223
 ifeq ($(TARGET_IP)$(filter run,$(MAKECMDGOALS)),run)
 $(warning The target IP address is not set)
 $(warning Run as "TARGET_IP=192.168.202.xxx make run" or modify Makefile)
