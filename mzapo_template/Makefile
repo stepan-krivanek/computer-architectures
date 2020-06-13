@@ -9,7 +9,7 @@ LDFLAGS = -lrt -lpthread
 SOURCES = main.c snake.c menu.c game_utils.c mzapo_phys.c mzapo_parlcd.c font_prop14x16.c font_rom8x16.c
 #SOURCES += font_prop14x16.c font_rom8x16.c
 TARGET_EXE = change_me
-TARGET_IP ?= 192.168.202.211
+TARGET_IP ?= 192.168.202.127
 ifeq ($(TARGET_IP),)
 ifneq ($(filter debug run,$(MAKECMDGOALS)),)
 $(warning The target IP address is not set)

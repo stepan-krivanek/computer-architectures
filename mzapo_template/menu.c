@@ -1,48 +1,85 @@
 #include "menu.h"
 
-void printLine(char *string, uint32_t* buffer, int x, int y) {
-    if (string == NULL) return;
-    char c;
-    int h, w, index, set;
-    int len = 0;
-    int i = 0;
-    
-    while ((c = string[i]) != '\0') {
-        index = ((int) c) - font_winFreeSystem14x16.firstchar;
+#define FIRST_ROW 20
+#define ROW_SPACING 30
+#define NUM_OF_ROWS 4
 
-        for (h = 0; h < font_winFreeSystem14x16.height; ++h) {
-            for (w = 0; w < font_winFreeSystem14x16.width[index]; ++w) {
-                set = (
-                  font_winFreeSystem14x16.bits[index * font_winFreeSystem14x16.height + h]
-                  >> (font_winFreeSystem14x16.maxwidth - w)
-                ) & 1;
+static int players = 1;
+static int speed = 1;
+static int cursor = 1;
 
-                buffer[x + len + w + (y + h + 4) * H_PIXELS] = set ? WHITE_16 : BLACK_16;
-            }
-        }
-
-        len += font_winFreeSystem14x16.width[index];
-        i++;
+int changePlayers(Display* display, uint8_t* lcd, bool more){
+    int playersNum = players + (more ? 1 : -1);
+    if (playersNum < 1 || playersNum > 2){
+        return players;
     }
+    players = playersNum;
+
+    Point x1 = {150, FIRST_ROW + ROW_SPACING};
+    Point x2 = {170, FIRST_ROW + ROW_SPACING};
+
+    if (players == 1){
+        printLine("1", (uint32_t*)display->pixels, x1, BLACK_16, WHITE_16);
+        printLine("2", (uint32_t*)display->pixels, x2, WHITE_16, BLACK_16);
+    } else {
+        printLine("1", (uint32_t*)display->pixels, x1, WHITE_16, BLACK_16);
+        printLine("2", (uint32_t*)display->pixels, x2, BLACK_16, WHITE_16);
+    }
+    
+    draw(display, lcd);
+    return players;
 }
 
-void menu(Display* display, uint8_t* lcd){
-    int numOfPlayers = -1;
-    int speed = -1;
+int changeSpeed(Display* display, uint8_t* lcd, bool more){
+    int newSpeed = speed + (more ? 1 : -1); 
+    if (newSpeed < 1 || newSpeed > 2){
+        return speed;
+    }
+    speed = newSpeed;
 
-    printLine("NUMBER OF PLAYERS:", (uint32_t*)display->pixels, 60, 20);
-    printLine("1 OR 2", (uint32_t*)display->pixels, 90, 50);
-    printLine("SNAKE SPEED:", (uint32_t*)display->pixels, 60, 80);
-    printLine("1x OR 2x", (uint32_t*)display->pixels, 90, 110);
+    Point x1 = {150, FIRST_ROW + ROW_SPACING * 2};
+    Point x2 = {170, FIRST_ROW + ROW_SPACING * 2};
+
+    if (speed == 1){
+        printLine("1", (uint32_t*)display->pixels, x1, BLACK_16, WHITE_16);
+        printLine("2", (uint32_t*)display->pixels, x2, WHITE_16, BLACK_16);
+    } else {
+        printLine("1", (uint32_t*)display->pixels, x1, WHITE_16, BLACK_16);
+        printLine("2", (uint32_t*)display->pixels, x2, BLACK_16, WHITE_16);
+    }
+    
+    draw(display, lcd);
+    return speed;
+}
+
+int redrawCursor(Display* display, uint8_t* lcd, bool more){
+    cursor = (cursor + NUM_OF_ROWS + (more ? 1 : -1)) % NUM_OF_ROWS;
+
+    Point p = {50, FIRST_ROW};
+    for (int i = 0; i < NUM_OF_ROWS; ++i){
+        printLine(">", (uint32_t*)display->pixels, p, BLACK_16, BLACK_16);
+        p.y += ROW_SPACING;
+    }
+
+    p.y = FIRST_ROW + ROW_SPACING * cursor;
+    printLine(">", (uint32_t*)display->pixels, p, WHITE_16, BLACK_16);
     draw(display, lcd);
 
-    while(numOfPlayers != 1 && numOfPlayers != 2){
-        scanf("%d", &numOfPlayers);
-        printf("players: %d\n", numOfPlayers);
-    }
+    return cursor;
+}
 
-    while(speed != 1 && speed != 2){
-        scanf("%d", &speed);
-        printf("speed: %d\n", speed);
+void initMenu(Display* display, uint8_t* lcd){
+    players = 1;
+    speed = 1;
+    cursor = 1;
+
+    char names[NUM_OF_ROWS][10] = {"START", "PLAYERS", "SPEED", "QUIT"};
+    Point p = {80, FIRST_ROW}; 
+
+    for (int i = 0; i < NUM_OF_ROWS; i++){
+        printLine(names[i], (uint32_t*)display->pixels, p, WHITE_16, BLACK_16);
+        p.y += ROW_SPACING;
     }
+    
+    draw(display, lcd);
 }
