@@ -20,6 +20,8 @@
 #include <time.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <termios.h>
+#include <unistd.h>
 
 #include "mzapo_parlcd.h"
 #include "mzapo_phys.h"
@@ -72,6 +74,8 @@ typedef struct {
   Node* tail;
   Point dir;
 } Snake;
+
+static struct termios orig_termios;
 
 static const Direction dir = {
   .LEFT = {-1, 0},
@@ -253,6 +257,91 @@ void msSleep(int ms){
     nanosleep(&ts, &ts);
 }
 
+void printLine(char *string, uint32_t* buffer, int x, int y) {
+    if (string == NULL) return;
+    char c;
+    int h, w, index, set;
+    int len = 0;
+    int i = 0;
+    
+    while ((c = string[i]) != '\0') {
+        index = ((int) c) - font_winFreeSystem14x16.firstchar;
+
+        for (h = 0; h < font_winFreeSystem14x16.height; ++h) {
+            for (w = 0; w < font_winFreeSystem14x16.width[index]; ++w) {
+                set = (
+                  font_winFreeSystem14x16.bits[index * font_winFreeSystem14x16.height + h]
+                  >> (font_winFreeSystem14x16.maxwidth - w)
+                ) & 1;
+
+                buffer[x + len + w + (y + h + 4) * H_PIXELS] = set ? WHITE_16 : BLACK_16;
+            }
+        }
+
+        len += font_winFreeSystem14x16.width[index];
+        i++;
+    }
+}
+
+Point* menu(Display* display, uint8_t* lcd){
+  Point* point = NULL;
+  int numOfPlayers = -1;
+  int speed = -1;
+
+  printLine("NUMBER OF PLAYERS:", (uint32_t*)display->pixels, 60, 20);
+	printLine("1 OR 2", (uint32_t*)display->pixels, 90, 50);
+	printLine("SNAKE SPEED:", (uint32_t*)display->pixels, 60, 80);
+	printLine("1x OR 2x", (uint32_t*)display->pixels, 90, 110);
+  draw(display, lcd);
+
+  while(numOfPlayers != 1 && numOfPlayers != 2){
+    scanf("%d", &numOfPlayers);
+    printf("players: %d\n", numOfPlayers);
+  }
+
+  while(speed != 1 && speed != 2){
+    scanf("%d", &speed);
+    printf("speed: %d\n", speed);
+  }
+  
+  return point;
+}
+
+void disableRawMode() {
+  tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
+}
+
+void enableRawMode() {
+  tcgetattr(STDIN_FILENO, &orig_termios);
+  atexit(disableRawMode);
+
+  struct termios raw = orig_termios;
+  raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
+  raw.c_oflag &= ~(OPOST);
+  raw.c_cflag |= (CS8);
+  raw.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
+  raw.c_cc[VMIN] = 0;   
+  raw.c_cc[VTIME] = 1;  //timeout 1/10 s
+
+  tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
+}
+
+void movement(Snake* snake1, Snake* snake2)
+{
+  char input;
+  read(STDIN_FILENO, &input, 1);
+  
+  if(input == 'w' && abs(snake1->dir.y) != 1) snake1->dir = dir.UP;
+  if(input == 's' && abs(snake1->dir.y) != 1) snake1->dir = dir.DOWN;
+  if(input == 'a' && abs(snake1->dir.x) != 1) snake1->dir = dir.LEFT;
+  if(input == 'd' && abs(snake1->dir.x) != 1) snake1->dir = dir.RIGHT;
+  
+  if(input == 'i' && abs(snake2->dir.y) != 1) snake2->dir = dir.UP;
+  if(input == 'k' && abs(snake2->dir.y) != 1) snake2->dir = dir.DOWN;
+  if(input == 'j' && abs(snake2->dir.x) != 1) snake2->dir = dir.LEFT;
+  if(input == 'l' && abs(snake2->dir.x) != 1) snake2->dir = dir.RIGHT;
+}
+
 int main(int argc, char *argv[]) {
   startingSignal();
 
@@ -264,15 +353,19 @@ int main(int argc, char *argv[]) {
   int width = H_PIXELS / SNAKE_SIZE;
   int height = V_PIXELS / SNAKE_SIZE;
   uint16_t* pixels = malloc(V_PIXELS * H_PIXELS * sizeof(uint16_t));
-  for (int i = 0; i < V_PIXELS * H_PIXELS; ++i){
-    pixels[i] = BLACK_16;
-  }
+  
   
   Display display = {
     .width = width,
     .height = height,
     .pixels = pixels
   };
+
+  //menu(&display, lcd);
+
+  for (int i = 0; i < V_PIXELS * H_PIXELS; ++i){
+    pixels[i] = BLACK_16;
+  }
 
   Point start1 = {
     .x = width / 4,
@@ -294,11 +387,13 @@ int main(int argc, char *argv[]) {
   changeLedColor(snake1.id, GREEN_32);
   changeLedColor(snake2.id, GREEN_32);
 
+  enableRawMode();
   bool death1 = false;
   bool death2 = false;
   while (!death1 && !death2){
     msSleep(700);
 
+    movement(&snake1, &snake2);
     bool frogWasEaten1 = updateSnake(&display, &snake1, frog);
     bool frogWasEaten2 = updateSnake(&display, &snake2, frog);
     if (frogWasEaten1 || frogWasEaten2){
@@ -339,5 +434,6 @@ int main(int argc, char *argv[]) {
   freeSnake(&snake1);
   freeSnake(&snake2);
   free(pixels);
+  disableRawMode();
   return 0;
 }
